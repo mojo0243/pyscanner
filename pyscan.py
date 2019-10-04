@@ -18,9 +18,7 @@ R  = '\033[31m' # red
 G  = '\033[32m' # green
 O  = '\033[33m' # orange
 B  = '\033[36m' # blue
-P  = '\033[35m' # purple
 C  = '\033[34m' # cyan
-GR = '\033[37m' # gray
 T  = '\033[93m' # tan
 
 pscan = False
@@ -99,20 +97,7 @@ print ""
 print "Total time for host discovery: ", total
 print ""
 
-def portscan(port):
-	print T+"Starting scan on host: ", ip
-	try:
-		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		conn = sock.connect((t_IP, port))
-		if conn == 0:
-			print "Port", port, "is open"
-		sock.close()
-	except:
-		print "Port", port, "is closed"
-
 def portdata():
-
-	print_lock = threading.Lock()
 
 # Define required variables
 	if flags.sport:
@@ -134,9 +119,6 @@ def portdata():
 	# Shuffle the list of ports for randomization
 
 	shuffle(ports)
-
-	socket.setdefaulttimeout(0.25)
-	print_lock = threading.Lock()
 
 	for ip in up:
 		t_IP = socket.gethostbyname(ip)
