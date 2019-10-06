@@ -4,9 +4,10 @@
 
 import socket
 import time
-import threading
 import os
 import argparse
+import ipaddress
+import multiprocessing
 
 from datetime import datetime
 from random import shuffle
@@ -29,13 +30,13 @@ flag_parser = argparse.ArgumentParser()
 
 # Define variable arguments for ping sweep
 
-flag_parser.add_argument('-n', dest='net', action='store', help='Provide the first three octets of the network you would like to scan')
-flag_parser.add_argument('-s', dest='stn', action='store', help='Provide the first number of the network you would like to scan')
-flag_parser.add_argument('-e', dest='en', action='store', help='Provide the last number of the network you would like to scan')
+flag_parser.add_argument('-n', dest='net', action='store', help='Provide the first network with cider you would like to scan EX: 192.168.1.0/24')
 
 # Define variable arguments for Port scan
 
 flag_parser.add_argument('-ps', '--pscan', action='store_true', help='This flag will enable port scan options')
+flag_parser.add_argument('-d', dest='range', action='store', help='Provide a portrange to scan with a dash EX: 1-100')
+flag_parser.add_argument('-uL', dest='userList', action='store', help='Provide a list of ports to scan seperated by a comma EX: 1,3,80,445,8080')
 flag_parser.add_argument('-sp', dest='sport', action='store', help='Provide the starting port number you would like to scan')
 flag_parser.add_argument('-ep', dest='eport', action='store', help='Provide the ending port you would like to scan')
 
@@ -46,103 +47,124 @@ if flags.pscan:
 
 # Define other required variables
 
-a = '.'
-stnum = int(flags.stn)
-end = int(flags.en)
-end = end+1
+ipNet = ipaddress.ip_network(unicode(flags.net), strict = False)
 
-ping1 = 'ping -c 1 '
+# Create list for IPs and multiprocessing
 
-# Create list for IP randomization
-
-ips = []
 up = []
+processes = []
 
-# Push all options for last octet of IP to list
+# Create list for Ports and multiprocessing
 
-for i in range(stnum, end, 1):
-	ips.append(i)
+up2 = []
+portProcesses = []
 
-# Shuffle the list for randomization
+# Conduct Ping Sweep
 
-shuffle(ips)
+def ping(ip, up):
+	response = os.popen('ping -c 1 -W 1 '+ip, 'r')
+	rping = response.read()
+	response.close()
 
-# Define Start time
+	if "bytes from "+ip in rping:
+		up.append(rping.split()[1])
 
-t1 = datetime.now()
+# Conduct Port Scan
 
-os.system('clear')
-print (C+"Scanning in progress...")
+def portsweep(up2, port, openPorts):
 
-# Conduct randomized ping sweep
+	for ip in up2:
+		t_IP = str(ip)
 
-for ip in ips:
-	addr = flags.net + a + str(ip)
-	icmp = ping1 + addr
-	response = os.popen(icmp)
+		try:
+			sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			conn = sock.connect_ex((t_IP, port))
 
-	for line in response.readlines():
-		if (line.count("ttl")):
-			up.append(addr)
-			print ""
-			print G+"[+]"+W+" -->  " +G+ addr +W+ " is UP"
+			if conn == 0:
 
-t2 = datetime.now()
+				print G+"[+] "+W+"Port "+G+"{}".format(port)+W+" is open on "+T+t_IP
+				print ""
+		except:
+			pass
 
-total = t2 - t1
+def portdata(up2):
 
-print ""
-print T+"Host discovery complete"
-print ""
-print "Total time for host discovery: ", total
-print ""
+	plist = []
 
-def portdata():
-
-# Define required variables
-	if flags.sport:
-		stport = int(flags.sport)
-
-	if flags.eport:
-		enport = int(flags.eport)
+	if flags.range:
+		portRange = flags.range.split('-')
+		stport = int(portRange[0])
+		enport = int(portRange[1])
 		enport = enport+1
 
-	# Create list of ports for randomization
+		for p in range(stport, enport, 1):
+			plist.append(p)
 
-	ports = []
+	if flags.userList:
+		portlist = flags.userList.split(',')
+		for i in portlist:
+			userPort = int(i)
+			plist.append(userPort)
 
-	# Push all options for ports to list
+	shuffle(plist)
 
-	for p in range(stport, enport, 1):
-		ports.append(p)
+	with multiprocessing.Manager() as manager:
+		openPorts = manager.list()
 
-	# Shuffle the list of ports for randomization
+		for por in plist:
+			port = por
+			po = multiprocessing.Process(target=portsweep, args=[up2, port, openPorts])
+			po.start()
+			portProcesses.append(po)
 
-	shuffle(ports)
+		for pop in portProcesses:
+			pop.join()
 
-	for ip in up:
-		t_IP = socket.gethostbyname(ip)
-		print C+"Starting scan on host: ", R+t_IP
-		print ""
+# Define Main function
 
-		for port in ports:
-			try:
-				sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-				conn = sock.connect_ex((t_IP, port))
-				if conn == 0:
-					print G+"[+]" +W+ " PORT " +G+ "{}".format(port) +W+ " is OPEN\n"
-				conn.close()
-			except:
-				pass
+def main():
 
+	os.system('clear')
+	print C+"Scanning in progress..."
 
-if pscan == True:
-	pt1 = datetime.now()
-	print B+"Beginning Port scan..."
+	t1 = datetime.now()
+
+	with multiprocessing.Manager() as manager:
+		up = manager.list()
+
+		for i in ipNet.hosts():
+			ip = str(i)
+			p = multiprocessing.Process(target=ping, args=[ip, up])
+			p.start()
+			processes.append(p)
+
+		for process in processes:
+			process.join()
+
+		for t in up:
+			print G+"[+] "+W+"  -->  " +G+ t +W+ "  is UP"
+
+		up2 = up[:]
+
+	t2 = datetime.now()
+	total = t2 - t1
+
 	print ""
-	portdata()
-	pt2 = datetime.now()
-	ptotal = pt2 - pt1
-	print O+"Total port scan time : ", ptotal
+	print T+"Host Discovery Complete"
+	print ""
+	print "Total time for host discovery: ", total
+	print ""
+
+	if pscan == True:
+		pt1 = datetime.now()
+		print B+"Beginning Port Scan..."
+		print ""
+		portdata(up2)
+		pt2 = datetime.now()
+		ptotal = pt2 - pt1
+		print O+"Total port scan time: ", ptotal
+
+if __name__ == "__main__":
+	main()
 
 
