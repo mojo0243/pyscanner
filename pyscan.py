@@ -37,8 +37,6 @@ flag_parser.add_argument('-n', dest='net', action='store', help='Provide the fir
 flag_parser.add_argument('-ps', '--pscan', action='store_true', help='This flag will enable port scan options')
 flag_parser.add_argument('-d', dest='range', action='store', help='Provide a portrange to scan with a dash EX: 1-100')
 flag_parser.add_argument('-uL', dest='userList', action='store', help='Provide a list of ports to scan seperated by a comma EX: 1,3,80,445,8080')
-flag_parser.add_argument('-sp', dest='sport', action='store', help='Provide the starting port number you would like to scan')
-flag_parser.add_argument('-ep', dest='eport', action='store', help='Provide the ending port you would like to scan')
 
 flags = flag_parser.parse_args()
 
